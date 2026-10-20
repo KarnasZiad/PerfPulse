@@ -67,5 +67,10 @@ export default defineConfig(
     extends: [tseslint.configs.disableTypeChecked],
     languageOptions: { globals: globals.node },
   },
+  {
+    // k6 scripts run in the k6 runtime, not in Node.js.
+    files: ['load/**/*.js'],
+    languageOptions: { globals: { __ENV: 'readonly' } },
+  },
   prettier,
 );
