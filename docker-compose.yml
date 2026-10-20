@@ -1,0 +1,125 @@
+# Local stack.
+#   docker compose up -d                  TimescaleDB, MongoDB and Redis (run the services with pnpm dev)
+#   docker compose --profile app up -d    full stack built from the Dockerfiles
+# Databases listen on the loopback only and have no authentication: local development only.
+name: perfpulse
+
+services:
+  timescale:
+    image: timescale/timescaledb:2.30.2-pg17
+    environment:
+      POSTGRES_DB: perfpulse
+      POSTGRES_USER: perfpulse
+      POSTGRES_PASSWORD: perfpulse
+    ports:
+      - '127.0.0.1:5432:5432'
+    volumes:
+      - timescale-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U perfpulse -d perfpulse']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  mongo:
+    image: mongo:8.0
+    ports:
+      - '127.0.0.1:27017:27017'
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ['CMD', 'mongosh', '--quiet', '--eval', 'db.adminCommand("ping").ok']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7.4-alpine
+    # AOF: the stream backlog survives a restart (ADR 0003).
+    command: ['redis-server', '--appendonly', 'yes']
+    ports:
+      - '127.0.0.1:6379:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  migrate:
+    profiles: [app]
+    build:
+      context: .
+      dockerfile: apps/processor/Dockerfile
+    command: ['node', 'dist/cli/migrate.js']
+    environment:
+      DATABASE_URL: postgresql://perfpulse:perfpulse@timescale:5432/perfpulse
+    depends_on:
+      timescale:
+        condition: service_healthy
+
+  ingest:
+    profiles: [app]
+    build:
+      context: .
+      dockerfile: apps/ingest/Dockerfile
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://perfpulse:perfpulse@timescale:5432/perfpulse
+      REDIS_URL: redis://redis:6379
+    # Public in production, behind a CDN or a load balancer (then set TRUST_PROXY_HOPS).
+    ports:
+      - '4100:4100'
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  processor:
+    profiles: [app]
+    build:
+      context: .
+      dockerfile: apps/processor/Dockerfile
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://perfpulse:perfpulse@timescale:5432/perfpulse
+      MONGODB_URL: mongodb://mongo:27017
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  api:
+    profiles: [app]
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://perfpulse:perfpulse@timescale:5432/perfpulse
+      MONGODB_URL: mongodb://mongo:27017
+      API_TOKEN_PEPPER: ${API_TOKEN_PEPPER:?Set API_TOKEN_PEPPER in .env}
+      SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET in .env}
+      # The local stack is served over plain HTTP.
+      COOKIE_SECURE: 'false'
+    ports:
+      - '127.0.0.1:4200:4200'
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      mongo:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  timescale-data:
+  mongo-data:
+  redis-data:
