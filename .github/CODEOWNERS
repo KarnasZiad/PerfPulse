@@ -1,0 +1,9 @@
+# Code owners are requested automatically on every pull request.
+* @KarnasZiad
+
+# The SDK runs on third-party sites, and the ingestion endpoint is public: security-focused review.
+/packages/sdk/ @KarnasZiad
+/packages/protocol/ @KarnasZiad
+/apps/ingest/ @KarnasZiad
+/apps/processor/migrations/ @KarnasZiad
+/docs/security/ @KarnasZiad
