@@ -48,7 +48,8 @@ flowchart LR
   redis -->|groupe de consommateurs| processor[Processeur]
   processor -->|INSERT multi-lignes| tsdb[(TimescaleDB)]
   processor -->|bulkWrite| mongo[(MongoDB)]
-  api[API de lecture] --> tsdb
+  web[Tableau de bord Vue 3] -->|/api, même origine| api[API de lecture]
+  api --> tsdb
   api --> mongo
 ```
 
@@ -59,18 +60,20 @@ flowchart LR
 | `apps/ingest`       | Validation, liste d'origines, limitation de débit, enrichissement, écriture du stream     |
 | `apps/processor`    | Consommateurs, écritures par lots, reprise des orphelins, file d'erreurs, migrations, CLI |
 | `apps/api`          | Session par jeton de lecture, p75, séries, pages, groupes d'erreurs                       |
+| `apps/web`          | Tableau de bord : p75 et seuils, répartition bon / à améliorer / mauvais, pages, erreurs  |
 
 Détails : [C4](docs/architecture/c4.md), [pipeline d'ingestion](docs/architecture/ingestion-pipeline.md),
 [protocole](docs/protocol.md), [modèle de données](docs/database.md),
 [ADR](docs/adr/0001-enregistrer-les-decisions-d-architecture.md).
 
-| Couche   | Technologies                                                                  |
-| -------- | ----------------------------------------------------------------------------- |
-| SDK      | TypeScript, `PerformanceObserver`, `sendBeacon`, esbuild                      |
-| Serveurs | Node.js 22, Fastify 5, Zod 4, ioredis (Streams), postgres.js, Pino            |
-| Données  | TimescaleDB 2.30 (PostgreSQL 17), MongoDB 8, Redis 7                          |
-| Tests    | Vitest, jsdom, `fastify.inject`, Testcontainers, k6                           |
-| CI/CD    | GitHub Actions, CodeQL, Trivy, revue des dépendances, Dependabot, images GHCR |
+| Couche   | Technologies                                                                   |
+| -------- | ------------------------------------------------------------------------------ |
+| SDK      | TypeScript, `PerformanceObserver`, `sendBeacon`, esbuild                       |
+| Serveurs | Node.js 22, Fastify 5, Zod 4, ioredis (Streams), postgres.js, Pino             |
+| Données  | TimescaleDB 2.30 (PostgreSQL 17), MongoDB 8, Redis 7                           |
+| Web      | Vue 3, Vue Router, Pinia, ECharts 6 (modules importés un à un), Tailwind CSS 4 |
+| Tests    | Vitest, jsdom, `fastify.inject`, Testcontainers, k6                            |
+| CI/CD    | GitHub Actions, CodeQL, Trivy, revue des dépendances, Dependabot, images GHCR  |
 
 ## Démarrage rapide
 
@@ -83,13 +86,15 @@ docker compose up -d                      # TimescaleDB, MongoDB, Redis
 pnpm --filter @perfpulse/processor db:migrate
 pnpm --filter @perfpulse/processor project:create --name "Boutique" --slug boutique \
   --origin http://localhost:5173
-pnpm dev                                  # ingestion :4100, processeur, API :4200
+pnpm dev                                  # ingestion :4100, processeur, API :4200, tableau de bord :5174
 ```
 
 La commande `project:create` affiche la **clé publique** du SDK et le **jeton de lecture** du
-tableau de bord ; ce dernier n'est affiché qu'une fois et n'est stocké qu'en empreinte.
+tableau de bord ; ce dernier n'est affiché qu'une fois et n'est stocké qu'en empreinte. Il suffit
+de le coller sur http://localhost:5174 ; un autre jeton ajoute son projet à la même session.
 
-Pile complète depuis les Dockerfiles : `docker compose --profile app up -d --build`.
+Pile complète depuis les Dockerfiles : `docker compose --profile app up -d --build`. Le tableau de
+bord (Nginx) est alors servi sur http://localhost:5174 et reste le seul accès à l'API.
 
 ## Performance
 
@@ -113,12 +118,14 @@ Test de charge : [`load/collect.js`](load/collect.js) (k6), seuils p99 < 20 ms e
   écartés, valeurs aberrantes ignorées.
 - **Jetons de lecture** de 238 bits, stockés en HMAC, échangés contre une session signée
   `HttpOnly` `SameSite=Strict` ; un projet hors session répond `404`.
+- **Tableau de bord sous CSP stricte** : ni script ni style en ligne, API sur la même origine,
+  piles d'appels et messages d'erreur des visiteurs affichés comme texte, jamais comme HTML.
 - [Modèle de menaces STRIDE](docs/security/threat-model.md) : 15 menaces et leurs mesures.
 
 ## Tests et qualité
 
 ```bash
-pnpm test:coverage                         # 113 tests unitaires et HTTP, seuils de 85 à 95 %
+pnpm test:coverage                         # 163 tests unitaires, HTTP et composants, seuils de 80 à 95 %
 pnpm test:integration                      # TimescaleDB, MongoDB et Redis réels (Docker requis)
 pnpm --filter @perfpulse/sdk size          # budget du SDK
 ```
@@ -129,12 +136,13 @@ pnpm --filter @perfpulse/sdk size          # budget du SDK
 | Ingestion  | Origine refusée, robots, 413, débit, valeurs aberrantes, aucune IP dans le stream                 |
 | Processeur | Empreintes stables entre builds, message empoisonné isolé, reprise d'un consommateur arrêté       |
 | API        | p75 à ± 2,5 %, session falsifiée ou expirée, cloisonnement des projets, révocation                |
+| Web        | Garde de navigation, filtres dans l'URL, réponses obsolètes ignorées, pile rendue en texte        |
 
 ## Feuille de route
 
 - [x] Conception : cahier des charges, protocole, vie privée, C4, STRIDE, ADR
 - [x] SDK, ingestion, processeur, API de lecture
-- [ ] Tableau de bord Vue 3 + ECharts
+- [x] Tableau de bord Vue 3 + ECharts
 - [ ] Source maps pour déminifier les piles d'appels
 - [ ] Alertes : p75 au-delà d'un seuil, nouvelle erreur après une release
 - [ ] Navigation des applications monopages (SPA) mesurée vue par vue

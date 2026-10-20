@@ -110,13 +110,29 @@ services:
       SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET in .env}
       # The local stack is served over plain HTTP.
       COOKIE_SECURE: 'false'
-    ports:
-      - '127.0.0.1:4200:4200'
+      # Reached through the Nginx of the dashboard only: one proxy hop, and the origin it serves.
+      TRUST_PROXY_HOPS: '1'
+      PUBLIC_URL: http://localhost:5174
+    # No published port: a direct client could forge X-Forwarded-For and dodge the rate limit.
+    expose:
+      - '4200'
     depends_on:
       migrate:
         condition: service_completed_successfully
       mongo:
         condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    profiles: [app]
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    # Same port as the Vite dev server: PUBLIC_URL and the Origin check do not change.
+    ports:
+      - '127.0.0.1:5174:8080'
+    depends_on:
+      - api
     restart: unless-stopped
 
 volumes:
