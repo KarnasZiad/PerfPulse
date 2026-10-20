@@ -110,3 +110,23 @@ export function bucketOf(metric: Metric, value: number): number {
 export function bucketValue(metric: Metric, bucket: number): number {
   return BUCKET_BASE ** (bucket + 0.5) / scale(metric);
 }
+
+/** What the ingestion writes to the Redis stream, one message per accepted batch. */
+export interface EnrichedBatch {
+  project: string;
+  receivedAt: number;
+  session: string;
+  path: string;
+  release: string | null;
+  browser: string;
+  os: string;
+  device: Device;
+  country: string | null;
+  events: CollectedEvent[];
+}
+
+export const DEVICES = ['mobile', 'tablet', 'desktop'] as const;
+export type Device = (typeof DEVICES)[number];
+
+export const STREAM = 'pp:events';
+export const DEAD_LETTER_STREAM = 'pp:events:dead';

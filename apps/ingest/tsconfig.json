@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "types": ["node"],
+    "verbatimModuleSyntax": true,
+    // Type-checks against the protocol sources, so neither needs a prior build.
+    "customConditions": ["@perfpulse/source"],
+    "noEmit": true
+  },
+  "include": ["src", "test", "*.config.ts"]
+}
