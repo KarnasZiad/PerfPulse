@@ -1,0 +1,84 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-pulse-50: #ecfdf5;
+  --color-pulse-400: #34d399;
+  --color-pulse-600: #059669;
+  --color-pulse-900: #0f172a;
+
+  /* Chart chrome and ink: text never wears a series or status color. */
+  --color-surface: #fcfcfb;
+  --color-plane: #f9f9f7;
+  --color-ink: #0b0b0b;
+  --color-ink-2: #52514e;
+  --color-muted: #898781;
+  --color-hairline: #e1e0d9;
+  --color-series: #2a78d6;
+
+  /* Status steps, reserved for ratings and always paired with a label. */
+  --color-good: #0ca30c;
+  --color-warn: #fab219;
+  --color-poor: #d03b3b;
+  --color-better: #006300;
+
+  --font-sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Code', 'JetBrains Mono', monospace;
+}
+
+@layer base {
+  body {
+    @apply bg-plane text-ink antialiased;
+  }
+}
+
+@utility input {
+  @apply h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm shadow-sm focus:border-pulse-600 focus:ring-2 focus:ring-pulse-600/30 focus:outline-none;
+}
+
+@utility label {
+  @apply text-sm font-medium text-ink-2;
+}
+
+@utility btn {
+  @apply inline-flex h-9 items-center justify-center gap-2 rounded-md px-4 text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50;
+}
+
+@utility btn-primary {
+  @apply btn bg-pulse-900 text-white hover:bg-slate-700;
+}
+
+@utility btn-secondary {
+  @apply btn border border-slate-300 bg-white hover:bg-slate-100;
+}
+
+@utility card {
+  @apply rounded-xl border border-hairline bg-surface p-5 shadow-sm;
+}
+
+@layer components {
+  .data-table {
+    @apply w-full text-left text-sm;
+  }
+  .data-table th {
+    @apply bg-plane p-3 font-medium text-ink-2;
+  }
+  .data-table td {
+    @apply border-t border-hairline p-3;
+  }
+  .data-table .num {
+    @apply text-right tabular-nums;
+  }
+}
+
+/* ECharts tooltips: content is markup, and the CSP forbids style attributes in markup. */
+@layer components {
+  .pp-tip-title {
+    @apply text-muted;
+  }
+  .pp-tip-value {
+    @apply text-[13px] font-semibold text-ink;
+  }
+  .pp-tip-label {
+    @apply text-ink-2;
+  }
+}
