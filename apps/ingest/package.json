@@ -19,7 +19,7 @@
   },
   "dependencies": {
     "@perfpulse/protocol": "workspace:*",
-    "fastify": "^5.12.7",
+    "fastify": "^5.12.8",
     "ioredis": "^5.11.1",
     "postgres": "^3.4.9",
     "zod": "^4.6.7"
